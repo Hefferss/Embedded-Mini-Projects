@@ -1,0 +1,17 @@
+#include <Servo.h>
+
+Servo myServo;
+
+const int JOY_X  = A0;
+const int SERVO_PIN = 9;
+
+void setup() {
+  myServo.attach(SERVO_PIN);
+}
+
+void loop() {
+  int raw   = analogRead(JOY_X);       // 0–1023
+  int angle = map(raw, 0, 1023, 0, 180); // map to servo range
+  myServo.write(angle);
+  delay(15);
+}
