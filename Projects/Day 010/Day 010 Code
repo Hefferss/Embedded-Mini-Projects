@@ -1,0 +1,27 @@
+const int ldrPin    = A0;
+const int buzzerPin = 9;
+
+const int SILENCE_THRESHOLD = 100;
+const int MIN_FREQ = 200;
+const int MAX_FREQ = 1000;
+
+int smoothedVal = 0;
+
+void setup() {
+  pinMode(buzzerPin, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  int ldrVal = analogRead(ldrPin);
+  smoothedVal = (smoothedVal * 7 + ldrVal) / 8;
+
+  if (smoothedVal < SILENCE_THRESHOLD) {
+    noTone(buzzerPin);
+  } else {
+    int freq = map(smoothedVal, SILENCE_THRESHOLD, 1023, MIN_FREQ, MAX_FREQ);
+    tone(buzzerPin, freq);
+  }
+
+  delay(50);
+}
