@@ -1,0 +1,136 @@
+#include <SPI.h>
+#include <MFRC522.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <FastLED.h>
+
+// ── Pins ─────────────────────────────────────────────────
+#define SS_PIN        10
+#define RST_PIN       9
+#define VIBRATION_PIN 2
+#define LED_PIN       6
+#define NUM_LEDS      8
+
+// ── Objects ──────────────────────────────────────────────
+MFRC522 rfid(SS_PIN, RST_PIN);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+CRGB leds[NUM_LEDS];
+
+// ── State ────────────────────────────────────────────────
+bool systemUnlocked = false;
+bool lastVibState = HIGH;
+
+// ── Authorised UID ───────────────────────────────────────
+byte authorisedUID[] = {0x76, 0x32, 0x0A, 0x01};
+
+// ── Functions ────────────────────────────────────────────
+bool checkUID() {
+  if (rfid.uid.size != 4) return false;
+  for (byte i = 0; i < 4; i++) {
+    if (rfid.uid.uidByte[i] != authorisedUID[i]) return false;
+  }
+  return true;
+}
+
+void ledsOff() {
+  for (int i = 0; i < NUM_LEDS; i++) leds[i] = CRGB::Black;
+  FastLED.show();
+}
+
+void spinAnimation() {
+  for (int i = 0; i < NUM_LEDS * 3; i++) {
+    int led = i % NUM_LEDS;
+    leds[led] = CHSV(random8(), 255, 200);
+    FastLED.show();
+    delay(80);
+  }
+  for (int b = 0; b < 10; b++) {
+    for (int i = 0; i < NUM_LEDS; i++) leds[i].fadeLightBy(180);
+    FastLED.show();
+    delay(30);
+  }
+}
+
+void showLocked() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("** LOCKED **");
+  lcd.setCursor(0, 1);
+  lcd.print("Scan card...");
+}
+
+void showUnlocked() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("** UNLOCKED **");
+  lcd.setCursor(0, 1);
+  lcd.print("System Armed");
+}
+
+void showVibration() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("!! VIBRATION !!");
+  lcd.setCursor(0, 1);
+  lcd.print("Motion detected!");
+}
+
+// ── Setup ────────────────────────────────────────────────
+void setup() {
+  Serial.begin(9600);
+
+  SPI.begin();
+  rfid.PCD_Init();
+
+  lcd.init();
+  lcd.backlight();
+
+  pinMode(VIBRATION_PIN, INPUT_PULLUP);
+
+  FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
+  FastLED.setBrightness(60);
+  ledsOff();
+
+  showLocked();
+}
+
+// ── Loop ─────────────────────────────────────────────────
+void loop() {
+
+  // ── RFID check ───────────────────────────────────────
+  if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {
+    if (checkUID()) {
+      systemUnlocked = !systemUnlocked; // toggle lock/unlock
+
+      if (systemUnlocked) {
+        showUnlocked();
+      } else {
+        ledsOff();
+        showLocked();
+      }
+    } else {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("** DENIED **");
+      lcd.setCursor(0, 1);
+      lcd.print("Wrong card!");
+      delay(2000);
+      if (systemUnlocked) showUnlocked();
+      else showLocked();
+    }
+
+    rfid.PICC_HaltA();
+    rfid.PCD_StopCrypto1();
+  }
+
+  // ── Vibration check (only when unlocked) ─────────────
+  if (systemUnlocked) {
+    bool vibState = digitalRead(VIBRATION_PIN);
+    if (vibState == LOW && lastVibState == HIGH) {
+      showVibration();
+      spinAnimation();
+      showUnlocked(); // return to unlocked screen after animation
+    }
+    lastVibState = vibState;
+  }
+}
