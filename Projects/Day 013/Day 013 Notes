@@ -1,0 +1,36 @@
+#include <Wire.h>              // Include I2C library
+
+void setup() {
+  Wire.begin();                // Start I2C
+  Serial.begin(9600);          // Start serial monitor
+
+  Serial.println("Scanning...");
+}
+
+void loop() {
+
+  byte error, address;          // Variables for I2C checking
+  int devices = 0;              // Count detected devices
+
+  for(address = 1; address < 127; address++) {
+
+    Wire.beginTransmission(address); // Try connecting to address
+    error = Wire.endTransmission();  // Check result
+
+    if(error == 0) {
+
+      Serial.print("Device found at 0x");
+      Serial.println(address, HEX);
+
+      devices++;
+    }
+  }
+
+  if(devices == 0) {
+    Serial.println("No devices found");
+  }
+
+  delay(3000);                  // Scan every 3 seconds
+}//check to see device address location.
+
+
